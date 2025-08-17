@@ -1,0 +1,257 @@
+# TypeScript 开发规范
+
+## 类型定义规范
+
+### 1. 接口定义
+- 使用 `interface` 定义对象类型，使用 `type` 定义联合类型和工具类型
+- 接口名使用 PascalCase，属性名使用 camelCase
+- 可选属性使用 `?` 标记，必需属性不使用标记
+
+```typescript
+// ✅ 正确
+interface ZoteroConnectorSettings {
+  citeFormats: CitationFormat[];
+  citeSuggestTemplate?: string;
+  database: Database;
+  port?: string;
+}
+
+// ❌ 错误
+type ZoteroConnectorSettings = {
+  citeFormats: CitationFormat[];
+  citeSuggestTemplate?: string;
+  database: Database;
+  port?: string;
+}
+```
+
+### 2. 枚举定义
+- 使用 `enum` 定义常量集合
+- 枚举名使用 PascalCase，枚举值使用 SCREAMING_SNAKE_CASE
+
+```typescript
+// ✅ 正确
+export enum GroupingOptions {
+  Tag = 'tag',
+  AnnotationDate = 'annotation-date',
+  ExportDate = 'export-date',
+  Color = 'color',
+}
+```
+
+### 3. 类型别名
+- 使用 `type` 定义联合类型、交叉类型和工具类型
+- 复杂类型使用类型别名提高可读性
+
+```typescript
+// ✅ 正确
+export type Format = 'latex' | 'biblatex' | 'pandoc' | 'formatted-citation' | 'formatted-bibliography' | 'template';
+
+export type DatabaseWithPort = {
+  database: Database;
+  port?: string;
+};
+```
+
+## 函数定义规范
+
+### 1. 异步函数
+- 使用 `async/await` 处理异步操作
+- 明确指定返回类型，特别是 Promise 类型
+
+```typescript
+// ✅ 正确
+async function getNotesFromCiteKeys(
+  citeKeys: CiteKey[],
+  database: DatabaseWithPort
+): Promise<any[]> {
+  // 实现
+}
+
+// ❌ 错误
+function getNotesFromCiteKeys(citeKeys, database) {
+  // 缺少类型注解
+}
+```
+
+### 2. 回调函数
+- 使用箭头函数定义回调
+- 明确指定参数类型
+
+```typescript
+// ✅ 正确
+this.addCommand({
+  id: 'zdc-insert-notes',
+  name: 'Insert notes into current document',
+  editorCallback: (editor: Editor) => {
+    // 实现
+  }
+});
+```
+
+## 类定义规范
+
+### 1. 类属性
+- 明确指定属性类型
+- 使用访问修饰符（public、private、protected）
+
+```typescript
+// ✅ 正确
+export default class ZoteroConnector extends Plugin {
+  settings: ZoteroConnectorSettings;
+  emitter: Events;
+  fuse: Fuse<CiteKeyExport>;
+  
+  private async loadSettings(): Promise<void> {
+    // 实现
+  }
+}
+```
+
+### 2. 方法定义
+- 明确指定参数和返回类型
+- 使用 async/await 处理异步操作
+
+```typescript
+// ✅ 正确
+async onload(): Promise<void> {
+  await this.loadSettings();
+  this.emitter = new Events();
+  // 其他初始化
+}
+```
+
+## 导入导出规范
+
+### 1. 导入顺序
+1. 第三方库导入
+2. Obsidian API 导入
+3. 本地模块导入
+4. 类型导入
+
+```typescript
+// ✅ 正确
+import Fuse from 'fuse.js';
+import { EditableFileView, Events, Plugin, TFile } from 'obsidian';
+import { shellPath } from 'shell-path';
+
+import { DataExplorerView, viewType } from './DataExplorerView';
+import { LoadingModal } from './bbt/LoadingModal';
+import { getCAYW } from './bbt/cayw';
+import { exportToMarkdown, renderCiteTemplate } from './bbt/export';
+import { ZoteroConnectorSettings } from './types';
+```
+
+### 2. 导出方式
+- 默认导出使用 `export default`
+- 命名导出使用 `export`
+- 类型导出使用 `export type`
+
+```typescript
+// ✅ 正确
+export default class ZoteroConnector extends Plugin {
+  // 类实现
+}
+
+export interface CitationFormat {
+  name: string;
+  format: Format;
+  command?: string;
+}
+
+export type Database = 'Zotero' | 'Juris-M' | 'Custom';
+```
+
+## 错误处理规范
+
+### 1. 异常处理
+- 使用 try-catch 包装可能抛出异常的代码
+- 提供有意义的错误信息
+
+```typescript
+// ✅ 正确
+try {
+  const result = await request({
+    method: 'POST',
+    url: `http://127.0.0.1:${port}/better-bibtex/json-rpc`,
+    body: JSON.stringify(requestBody),
+    headers: defaultHeaders,
+  });
+  return JSON.parse(result).result;
+} catch (e) {
+  console.error(e);
+  new Notice(`Error retrieving data: ${e.message}`, 10000);
+  return null;
+}
+```
+
+### 2. 空值检查
+- 使用可选链操作符 `?.` 和空值合并操作符 `??`
+- 明确处理 undefined 和 null 值
+
+```typescript
+// ✅ 正确
+const path = await shellPath();
+process.env.PATH = path || [
+  './node_modules/.bin',
+  '/.nodebrew/current/bin',
+  '/usr/local/bin',
+  process.env.PATH,
+].join(':');
+```
+
+## 代码组织规范
+
+### 1. 文件结构
+- 每个文件只包含一个主要功能
+- 相关的类型定义放在同一个文件中
+- 工具函数按功能分组
+
+### 2. 注释规范
+- 使用 JSDoc 注释描述公共 API
+- 复杂逻辑添加行内注释
+- 注释使用中文，代码使用英文
+
+```typescript
+/**
+ * 从 Zotero 获取指定引用键的笔记
+ * @param citeKeys 引用键数组
+ * @param database 数据库配置
+ * @returns 笔记数据数组
+ */
+export async function getNotesFromCiteKeys(
+  citeKeys: CiteKey[],
+  database: DatabaseWithPort
+): Promise<any[]> {
+  // 实现
+}
+```
+
+## 性能优化规范
+
+### 1. 类型检查
+- 使用 `npm run check-types` 检查类型错误
+- 避免使用 `any` 类型，优先使用具体类型
+- 使用泛型提高代码复用性
+
+### 2. 内存管理
+- 及时清理事件监听器
+- 避免内存泄漏
+- 使用 WeakMap 和 WeakSet 处理对象引用
+
+```typescript
+// ✅ 正确
+onload() {
+  this.registerEvent(
+    this.app.workspace.on('file-open', this.handleFileOpen)
+  );
+}
+
+onunload() {
+  // 清理资源
+}
+```
+description:
+globs:
+alwaysApply: false
+---

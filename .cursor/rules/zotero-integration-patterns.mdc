@@ -1,0 +1,410 @@
+# Zotero 集成开发模式
+
+## Better BibTeX 通信模式
+
+### 1. JSON-RPC 通信
+- 使用 JSON-RPC 2.0 协议与 Better BibTeX 通信
+- 通过本地 HTTP 端口进行通信
+- 实现请求队列管理避免冲突
+
+```typescript
+// ✅ 正确
+export async function getNotesFromCiteKeys(
+  citeKeys: CiteKey[],
+  database: DatabaseWithPort
+): Promise<any[]> {
+  const qid = Symbol();
+  try {
+    await ZQueue.wait(qid);
+    const res = await request({
+      method: 'POST',
+      url: `http://127.0.0.1:${getPort(database.database, database.port)}/better-bibtex/json-rpc`,
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'item.notes',
+        params: [citeKeys.map((k) => k.key)],
+      }),
+      headers: defaultHeaders,
+    });
+    return JSON.parse(res).result;
+  } catch (e) {
+    console.error(e);
+    new Notice(`Error retrieving notes: ${e.message}`, 10000);
+    return null;
+  } finally {
+    ZQueue.end(qid);
+  }
+}
+```
+
+### 2. 端口管理
+- 根据数据库类型确定端口号
+- 支持自定义端口配置
+- 处理端口连接失败的情况
+
+```typescript
+// ✅ 正确
+export function getPort(database: Database, customPort?: string): string {
+  if (customPort) return customPort;
+  
+  switch (database) {
+    case 'Zotero':
+      return '23119';
+    case 'Juris-M':
+      return '24119';
+    default:
+      return '23119';
+  }
+}
+```
+
+### 3. 请求队列
+- 使用队列管理并发请求
+- 避免同时发送多个请求导致冲突
+- 提供请求超时和重试机制
+
+```typescript
+// ✅ 正确
+export class ZQueue {
+  private static queue: Promise<void> = Promise.resolve();
+  
+  static async wait(id: Symbol): Promise<void> {
+    const promise = new Promise<void>((resolve) => {
+      setTimeout(resolve, 100); // 请求间隔
+    });
+    
+    this.queue = this.queue.then(() => promise);
+    await this.queue;
+  }
+  
+  static end(id: Symbol): void {
+    // 标记请求完成
+  }
+}
+```
+
+## 数据获取模式
+
+### 1. 引用键处理
+- 使用 `CiteKey` 类型表示引用键
+- 支持从不同格式解析引用键
+- 处理引用键验证和错误
+
+```typescript
+// ✅ 正确
+export interface CiteKey {
+  key: string;
+  library: string;
+}
+
+export function getCiteKeyFromAny(input: string): CiteKey | null {
+  // 解析引用键格式
+  const match = input.match(/^([^:]+):(.+)$/);
+  if (!match) return null;
+  
+  return {
+    library: match[1],
+    key: match[2],
+  };
+}
+```
+
+### 2. 数据获取函数
+- 为每种数据类型提供专门的获取函数
+- 使用统一的错误处理模式
+- 支持批量数据获取
+
+```typescript
+// ✅ 正确
+export async function getItemJSONFromCiteKeys(
+  citeKeys: CiteKey[],
+  database: DatabaseWithPort
+): Promise<any[]> {
+  // 获取项目 JSON 数据
+}
+
+export async function getBibFromCiteKey(
+  citeKey: CiteKey,
+  database: DatabaseWithPort
+): Promise<string> {
+  // 获取 BibTeX 格式数据
+}
+
+export async function getAttachmentsFromCiteKey(
+  citeKey: CiteKey,
+  database: DatabaseWithPort
+): Promise<any[]> {
+  // 获取附件数据
+}
+```
+
+## 数据处理模式
+
+### 1. 笔记处理
+- 处理 HTML 格式的笔记内容
+- 转换为 Markdown 格式
+- 处理笔记的元数据
+
+```typescript
+// ✅ 正确
+async function processNote(
+  citeKey: CiteKey,
+  note: any,
+  importDate: moment.Moment,
+  database: DatabaseWithPort,
+  cslStyle?: string
+): Promise<void> {
+  if (note.note) {
+    note.note = htmlToMarkdown(
+      await processZoteroAnnotationNotes(citeKey.key, note.note, {})
+    );
+  }
+  
+  if (note.dateAdded) {
+    note.dateAdded = moment(note.dateAdded);
+  }
+  
+  note.desktopURI = getLocalURI('select', note.uri);
+  note.relations = await getRelations(note, citeKey.library, importDate, database, cslStyle);
+}
+```
+
+### 2. 附件处理
+- 处理 PDF 和其他附件文件
+- 提取附件元数据
+- 生成本地 URI
+
+```typescript
+// ✅ 正确
+function processAttachment(attachment: any): void {
+  if (attachment.dateAdded) {
+    attachment.dateAdded = moment(attachment.dateAdded);
+  }
+  
+  if (attachment.uri) {
+    attachment.itemKey = attachment.uri.split('/').pop();
+    attachment.desktopURI = attachment.select || getLocalURI('select', attachment.uri);
+    
+    if (attachment.path?.endsWith('.pdf')) {
+      attachment.pdfURI = getLocalURI('open-pdf', attachment.uri);
+    }
+  }
+}
+```
+
+### 3. 注释处理
+- 提取 PDF 注释和高亮
+- 处理注释的图片和位置信息
+- 生成注释的格式化输出
+
+```typescript
+// ✅ 正确
+function processAnnotation(
+  annotation: any,
+  attachment: any,
+  imageRelativePath: any
+): void {
+  annotation.date = moment(annotation.date);
+  annotation.attachment = attachment;
+  annotation.source = 'pdf';
+  
+  if (annotation.imagePath) {
+    annotation.imageBaseName = path.basename(annotation.imagePath);
+    annotation.imageExtension = path.extname(annotation.imagePath).slice(1);
+    annotation.imageRelativePath = normalizePath(imageRelativePath);
+  }
+}
+```
+
+## 模板渲染模式
+
+### 1. 模板环境
+- 使用 Nunjucks 模板引擎
+- 提供自定义过滤器和函数
+- 支持模板继承和包含
+
+```typescript
+// ✅ 正确
+export class PersistExtension {
+  tags = ['persist'];
+  
+  parse(parser: any, nodes: any): any {
+    const token = parser.nextToken();
+    const args = parser.parseSignature(null, true);
+    parser.advanceAfterBlockEnd(token.value);
+    
+    return new nodes.CallExtension(this, 'run', args);
+  }
+  
+  run(context: any, ...args: any[]): string {
+    // 模板渲染逻辑
+  }
+}
+```
+
+### 2. 模板辅助函数
+- 提供常用的模板辅助函数
+- 处理日期格式化
+- 支持条件渲染
+
+```typescript
+// ✅ 正确
+export function appendExportDate(template: string): string {
+  return template + '\n\n---\n*Exported on {{exportDate}}*';
+}
+
+export function getTemplates(plugin: ZoteroConnector): any {
+  return {
+    formatDate: (date: moment.Moment, format: string) => date.format(format),
+    formatNumber: (num: number) => num.toLocaleString(),
+    // 其他辅助函数
+  };
+}
+```
+
+## 文件导出模式
+
+### 1. Markdown 导出
+- 将 Zotero 数据转换为 Markdown 格式
+- 处理文件路径和链接
+- 支持自定义导出格式
+
+```typescript
+// ✅ 正确
+export async function exportToMarkdown(
+  citeKeys: CiteKey[],
+  params: ExportToMarkdownParams
+): Promise<void> {
+  const { settings, database, exportFormat } = params;
+  
+  // 获取数据
+  const items = await getItemJSONFromCiteKeys(citeKeys, database);
+  
+  // 处理每个项目
+  for (const item of items) {
+    await processItem(item, settings, exportFormat);
+  }
+}
+```
+
+### 2. 文件路径处理
+- 处理跨平台文件路径
+- 生成安全的文件名
+- 创建必要的目录结构
+
+```typescript
+// ✅ 正确
+export function sanitizeFilePath(path: string): string {
+  return path
+    .replace(/[<>:"/\\|?*]/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/__+/g, '_')
+    .trim();
+}
+
+export function mkMDDir(vault: any, path: string): Promise<void> {
+  return vault.createFolder(path).catch(() => {
+    // 目录已存在，忽略错误
+  });
+}
+```
+
+## 错误处理模式
+
+### 1. 连接错误
+- 处理 Zotero 未运行的情况
+- 处理端口连接失败
+- 提供用户友好的错误信息
+
+```typescript
+// ✅ 正确
+export async function isZoteroRunning(database: DatabaseWithPort): Promise<boolean> {
+  try {
+    const res = await request({
+      method: 'POST',
+      url: `http://127.0.0.1:${getPort(database.database, database.port)}/better-bibtex/json-rpc`,
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'user.groups',
+        params: [],
+      }),
+      headers: defaultHeaders,
+    });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+```
+
+### 2. 数据错误
+- 处理数据格式错误
+- 处理缺失字段
+- 提供数据验证
+
+```typescript
+// ✅ 正确
+function validateCiteKey(citeKey: CiteKey): boolean {
+  if (!citeKey.key || !citeKey.library) {
+    return false;
+  }
+  
+  // 其他验证逻辑
+  return true;
+}
+```
+
+## 性能优化模式
+
+### 1. 批量处理
+- 支持批量数据获取
+- 减少网络请求次数
+- 优化内存使用
+
+```typescript
+// ✅ 正确
+export async function getItemJSONFromCiteKeys(
+  citeKeys: CiteKey[],
+  database: DatabaseWithPort
+): Promise<any[]> {
+  // 批量获取多个项目的 JSON 数据
+  const keys = citeKeys.map(k => k.key);
+  
+  const res = await request({
+    method: 'POST',
+    url: `http://127.0.0.1:${getPort(database.database, database.port)}/better-bibtex/json-rpc`,
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'item.export',
+      params: [keys, 'json'],
+    }),
+    headers: defaultHeaders,
+  });
+  
+  return JSON.parse(res).result;
+}
+```
+
+### 2. 缓存机制
+- 缓存频繁访问的数据
+- 避免重复请求
+- 实现缓存失效策略
+
+```typescript
+// ✅ 正确
+const cache = new Map<string, any>();
+
+export async function getCachedData(key: string, fetcher: () => Promise<any>): Promise<any> {
+  if (cache.has(key)) {
+    return cache.get(key);
+  }
+  
+  const data = await fetcher();
+  cache.set(key, data);
+  return data;
+}
+```
+description:
+globs:
+alwaysApply: false
+---

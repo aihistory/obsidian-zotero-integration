@@ -1,0 +1,360 @@
+# Obsidian 插件开发规范
+
+## 插件基础结构
+
+### 1. 主类定义
+- 继承自 Obsidian 的 `Plugin` 类
+- 实现 `onload()` 和 `onunload()` 方法
+- 使用 `export default` 导出主类
+
+```typescript
+// ✅ 正确
+import { Plugin } from 'obsidian';
+
+export default class ZoteroConnector extends Plugin {
+  settings: ZoteroConnectorSettings;
+  
+  async onload(): Promise<void> {
+    await this.loadSettings();
+    this.addSettingTab(new ZoteroConnectorSettingsTab(this.app, this));
+    this.registerCommands();
+  }
+  
+  onunload(): void {
+    // 清理资源
+  }
+}
+```
+
+### 2. 设置管理
+- 使用 `loadData()` 和 `saveData()` 管理设置
+- 提供默认设置对象
+- 实现设置变更监听
+
+```typescript
+// ✅ 正确
+const DEFAULT_SETTINGS: ZoteroConnectorSettings = {
+  database: 'Zotero',
+  noteImportFolder: '',
+  citeFormats: [],
+  exportFormats: [],
+};
+
+async loadSettings(): Promise<void> {
+  this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+}
+
+async saveSettings(): Promise<void> {
+  await this.saveData(this.settings);
+}
+```
+
+## 命令注册规范
+
+### 1. 命令定义
+- 使用 `addCommand()` 注册命令
+- 提供唯一的命令 ID 和描述性名称
+- 实现适当的回调函数
+
+```typescript
+// ✅ 正确
+this.addCommand({
+  id: 'zdc-insert-notes',
+  name: 'Insert notes into current document',
+  editorCallback: (editor) => {
+    // 编辑器命令实现
+  }
+});
+
+this.addCommand({
+  id: 'zdc-search-zotero',
+  name: 'Search Zotero library',
+  callback: () => {
+    // 全局命令实现
+  }
+});
+```
+
+### 2. 命令前缀
+- 使用统一的前缀避免冲突
+- 在项目中使用常量定义前缀
+
+```typescript
+// ✅ 正确
+const commandPrefix = 'obsidian-zotero-desktop-connector:';
+const citationCommandIDPrefix = 'zdc-';
+const exportCommandIDPrefix = 'zdc-exp-';
+```
+
+## 视图注册规范
+
+### 1. 视图类型定义
+- 定义唯一的视图类型标识符
+- 实现 `ItemView` 接口
+
+```typescript
+// ✅ 正确
+export const viewType = 'zdc-debug';
+
+export class DataExplorerView extends ItemView {
+  constructor(leaf: WorkspaceLeaf, plugin: ZoteroConnector) {
+    super(leaf);
+    this.plugin = plugin;
+  }
+  
+  getViewType(): string {
+    return viewType;
+  }
+  
+  getDisplayText(): string {
+    return 'Zotero Data Explorer';
+  }
+}
+```
+
+### 2. 视图注册
+- 在 `onload()` 中注册视图
+- 提供视图工厂函数
+
+```typescript
+// ✅ 正确
+this.registerView(viewType, (leaf) => new DataExplorerView(this, leaf));
+```
+
+## 设置面板规范
+
+### 1. 设置标签页
+- 继承自 `PluginSettingTab`
+- 实现 `display()` 和 `hide()` 方法
+
+```typescript
+// ✅ 正确
+import { PluginSettingTab, Setting } from 'obsidian';
+
+export class ZoteroConnectorSettingsTab extends PluginSettingTab {
+  plugin: ZoteroConnector;
+  
+  constructor(app: App, plugin: ZoteroConnector) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+  
+  display(): void {
+    const { containerEl } = this;
+    containerEl.empty();
+    
+    // 设置项实现
+  }
+  
+  hide(): void {
+    const { containerEl } = this;
+    containerEl.empty();
+  }
+}
+```
+
+### 2. 设置项管理
+- 使用 `Setting` 类创建设置项
+- 提供适当的控件类型
+- 实现设置变更处理
+
+```typescript
+// ✅ 正确
+new Setting(containerEl)
+  .setName('Database')
+  .setDesc('Select the Zotero database to connect to')
+  .addDropdown((dropdown) => {
+    dropdown
+      .addOption('Zotero', 'Zotero')
+      .addOption('Juris-M', 'Juris-M')
+      .setValue(this.plugin.settings.database)
+      .onChange(async (value) => {
+        this.plugin.settings.database = value as Database;
+        await this.plugin.saveSettings();
+      });
+  });
+```
+
+## 文件操作规范
+
+### 1. 文件系统访问
+- 使用 Obsidian 的 `Vault` API
+- 避免直接使用 Node.js 文件系统 API
+- 处理文件不存在的情况
+
+```typescript
+// ✅ 正确
+const file = this.app.vault.getAbstractFileByPath(filePath);
+if (file instanceof TFile) {
+  const content = await this.app.vault.read(file);
+  // 处理文件内容
+}
+```
+
+### 2. 文件创建
+- 使用 `create()` 方法创建文件
+- 提供适当的文件夹路径
+- 处理文件创建失败的情况
+
+```typescript
+// ✅ 正确
+try {
+  await this.app.vault.create(
+    `${folderPath}/${fileName}.md`,
+    content
+  );
+} catch (error) {
+  new Notice(`Failed to create file: ${error.message}`);
+}
+```
+
+## 事件处理规范
+
+### 1. 事件注册
+- 使用 `registerEvent()` 注册事件
+- 在 `onunload()` 中自动清理事件
+- 避免内存泄漏
+
+```typescript
+// ✅ 正确
+this.registerEvent(
+  this.app.workspace.on('file-open', this.handleFileOpen)
+);
+
+this.registerEvent(
+  this.app.vault.on('modify', this.handleFileModify)
+);
+```
+
+### 2. 事件处理函数
+- 使用箭头函数绑定 this 上下文
+- 提供适当的错误处理
+- 避免在事件处理中执行耗时操作
+
+```typescript
+// ✅ 正确
+private handleFileOpen = (file: TFile | null) => {
+  if (!file) return;
+  
+  try {
+    // 处理文件打开事件
+  } catch (error) {
+    console.error('Error handling file open:', error);
+  }
+};
+```
+
+## 通知和用户反馈
+
+### 1. 通知使用
+- 使用 `Notice` 类显示临时通知
+- 提供适当的通知时长
+- 区分信息、警告和错误通知
+
+```typescript
+// ✅ 正确
+import { Notice } from 'obsidian';
+
+// 信息通知
+new Notice('Operation completed successfully');
+
+// 错误通知
+new Notice(`Error: ${error.message}`, 10000);
+
+// 警告通知
+new Notice('Warning: Some items were skipped', 5000);
+```
+
+### 2. 模态框使用
+- 使用 `Modal` 类创建模态框
+- 提供适当的用户交互
+- 处理模态框关闭
+
+```typescript
+// ✅ 正确
+import { Modal } from 'obsidian';
+
+export class LoadingModal extends Modal {
+  constructor(app: App, message: string) {
+    super(app);
+    this.message = message;
+  }
+  
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.createEl('h2', { text: this.message });
+  }
+  
+  onClose(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+}
+```
+
+## 性能优化规范
+
+### 1. 异步操作
+- 使用 `async/await` 处理异步操作
+- 避免阻塞主线程
+- 使用适当的错误处理
+
+```typescript
+// ✅ 正确
+async processData(): Promise<void> {
+  try {
+    const data = await this.fetchData();
+    await this.processDataAsync(data);
+  } catch (error) {
+    new Notice(`Processing failed: ${error.message}`);
+  }
+}
+```
+
+### 2. 资源管理
+- 及时清理事件监听器
+- 释放不再使用的资源
+- 避免内存泄漏
+
+```typescript
+// ✅ 正确
+onunload(): void {
+  // 清理事件监听器
+  this.app.workspace.off('file-open', this.handleFileOpen);
+  
+  // 清理其他资源
+  if (this.modal) {
+    this.modal.close();
+  }
+}
+```
+
+## 调试和日志
+
+### 1. 日志记录
+- 使用 `console.log()` 记录调试信息
+- 使用 `console.error()` 记录错误
+- 在生产环境中避免过多的日志输出
+
+```typescript
+// ✅ 正确
+console.log('Loading Zotero connector plugin');
+console.error('Failed to connect to Zotero:', error);
+```
+
+### 2. 开发模式
+- 使用开发模式标志控制调试功能
+- 提供调试视图和工具
+- 使用热重载提高开发效率
+
+```typescript
+// ✅ 正确
+if (process.env.NODE_ENV === 'development') {
+  console.log('Debug mode enabled');
+  this.registerDebugCommands();
+}
+```
+description:
+globs:
+alwaysApply: false
+---

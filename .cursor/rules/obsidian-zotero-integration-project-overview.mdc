@@ -1,0 +1,120 @@
+# Obsidian Zotero Integration - 项目架构指南
+
+## 项目概述
+这是一个功能丰富的 Obsidian 插件，主要功能是从 Zotero 中导入阅读笔记、引用、参考文献、PDF 注释等学术数据，并在 Obsidian 中生成格式化的笔记。
+
+## 核心功能
+- 🔍 **引用插入**：从 Zotero 搜索并插入引用到当前文档
+- 📚 **参考文献生成**：生成格式化的参考文献列表
+- 📝 **笔记导入**：导入 Zotero 中的笔记和注释
+- 📄 **PDF 注释提取**：提取 PDF 文件中的高亮、注释和图片
+- 🎨 **模板系统**：支持自定义模板格式化输出内容
+- 🔧 **Better BibTeX 集成**：与 Better BibTeX 插件深度集成
+- 📊 **数据浏览器**：提供可视化的数据浏览界面
+
+## 项目结构
+
+### 主入口文件
+- [src/main.ts](mdc:src/main.ts) - 插件主类 `ZoteroConnector`，继承自 Obsidian 的 Plugin 类
+
+### 核心配置文件
+- [manifest.json](mdc:manifest.json) - Obsidian 插件清单
+- [package.json](mdc:package.json) - npm 包配置，包含构建脚本和依赖
+- [tsconfig.json](mdc:tsconfig.json) - TypeScript 配置
+- [esbuild.config.mjs](mdc:esbuild.config.mjs) - ESBuild 构建配置
+
+### 主要目录结构
+```
+src/
+├── main.ts                          # 插件主入口
+├── types.ts                         # TypeScript 类型定义
+├── helpers.ts                       # 工具函数
+├── DataExplorerView.tsx             # 数据浏览器视图组件
+├── bbt/                            # Better BibTeX 相关功能
+│   ├── export.ts                   # 主要导出功能
+│   ├── exportNotes.ts              # 笔记导出功能
+│   ├── jsonRPC.ts                  # JSON-RPC 通信
+│   ├── cayw.ts                     # Copy As You Write 功能
+│   ├── extractAnnotations.ts       # PDF 注释提取
+│   ├── template.env.ts             # 模板环境
+│   ├── template.helpers.ts         # 模板辅助函数
+│   └── queue.ts                    # 请求队列管理
+└── settings/                       # 设置相关
+    ├── settings.tsx                # 主设置面板
+    ├── AssetDownloader.tsx         # 资源下载器
+    ├── CiteFormatSettings.tsx      # 引用格式设置
+    └── ExportFormatSettings.tsx    # 导出格式设置
+```
+
+## 核心架构组件
+
+### 1. 数据模型层 (Model)
+- **CitationFormat**：引用格式配置
+- **ExportFormat**：导出格式配置
+- **ZoteroConnectorSettings**：插件设置
+- **CiteKeyExport**：引用键导出数据
+
+### 2. 通信层 (Communication)
+- **JSON-RPC**：与 Zotero Better BibTeX 插件的通信协议
+- **HTTP 请求**：通过本地端口与 Zotero 通信
+- **队列管理**：防止请求冲突和超载
+
+### 3. 导出处理层 (Export)
+- **Markdown 导出**：将 Zotero 数据转换为 Markdown 格式
+- **PDF 注释提取**：提取 PDF 中的高亮、注释和图片
+- **模板渲染**：使用 Nunjucks 模板引擎渲染输出
+- **文件管理**：处理附件和图片的保存
+
+### 4. 用户界面层 (UI)
+- **设置面板**：插件配置界面
+- **数据浏览器**：可视化数据浏览和预览
+- **搜索界面**：Zotero 项目搜索和选择
+- **模板预览**：实时预览模板渲染结果
+
+### 5. 工具服务层 (Utils)
+- **路径处理**：跨平台路径处理
+- **文件操作**：Obsidian 文件系统操作
+- **时间处理**：使用 Moment.js 处理时间
+- **HTML 转换**：HTML 到 Markdown 转换
+
+## 支持的数据类型
+- 📚 **引用 (Citations)**：各种格式的学术引用
+- 📖 **参考文献 (Bibliographies)**：完整的参考文献列表
+- 📝 **笔记 (Notes)**：Zotero 中的笔记和评论
+- 🖼️ **PDF 注释 (PDF Annotations)**：高亮、注释、图片
+- 📎 **附件 (Attachments)**：PDF 文件和其他附件
+- 🏷️ **标签 (Tags)**：Zotero 标签系统
+- 📁 **集合 (Collections)**：Zotero 集合结构
+
+## 模板系统
+插件使用强大的模板系统：
+- **Nunjucks 模板引擎**：支持条件、循环、过滤器
+- **内置模板**：提供默认的导出模板
+- **自定义模板**：用户可以创建自定义模板
+- **变量支持**：支持 Zotero 数据的所有字段
+- **实时预览**：在设置中实时预览模板效果
+
+## 构建和开发
+- **开发模式**：`npm run dev` - 启用热重载
+- **生产构建**：`npm run build` - 生成优化后的 main.js
+- **代码检查**：`npm run lint` - ESLint 代码检查
+- **类型检查**：`npm run check-types` - TypeScript 类型检查
+- **格式化**：`npm run prettier` - 代码格式化
+
+## 数据流
+1. **用户操作** → 插件命令 → ZoteroConnector
+2. **数据获取** → JSON-RPC → Better BibTeX → Zotero
+3. **数据处理** → 模板渲染 → Markdown 生成
+4. **文件创建** → Obsidian 文件系统 → 用户笔记
+
+## 依赖关系
+- **Better BibTeX**：必须安装的 Zotero 插件
+- **Obsidian API**：核心插件 API
+- **React/Preact**：UI 组件库
+- **Nunjucks**：模板引擎
+- **Fuse.js**：模糊搜索
+- **Moment.js**：时间处理
+description:
+globs:
+alwaysApply: false
+---

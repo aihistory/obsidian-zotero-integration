@@ -1,0 +1,521 @@
+# React UI 开发规范
+
+## 组件结构规范
+
+### 1. 函数组件
+- 优先使用函数组件和 Hooks
+- 使用 TypeScript 类型注解
+- 提供适当的 Props 接口
+
+```typescript
+// ✅ 正确
+interface TemplatePreviewProps {
+  plugin: ZoteroConnector;
+  formatIndex: number | null;
+  templateData: Record<any, any>;
+}
+
+function TemplatePreview({
+  plugin,
+  formatIndex,
+  templateData,
+}: TemplatePreviewProps) {
+  const [templateError, setTemplateError] = React.useState<null | string>(null);
+  const [template, setTemplate] = React.useState<null | string>(null);
+  
+  // 组件实现
+  return (
+    <div className="template-preview">
+      {/* JSX 内容 */}
+    </div>
+  );
+}
+```
+
+### 2. 类组件
+- 仅在必要时使用类组件
+- 继承自 Obsidian 的基类
+- 实现必要的方法
+
+```typescript
+// ✅ 正确
+export class DataExplorerView extends ItemView {
+  plugin: ZoteroConnector;
+  
+  constructor(leaf: WorkspaceLeaf, plugin: ZoteroConnector) {
+    super(leaf);
+    this.plugin = plugin;
+  }
+  
+  getViewType(): string {
+    return viewType;
+  }
+  
+  getDisplayText(): string {
+    return 'Zotero Data Explorer';
+  }
+  
+  async onOpen(): Promise<void> {
+    // 视图打开逻辑
+  }
+  
+  async onClose(): Promise<void> {
+    // 视图关闭逻辑
+  }
+}
+```
+
+## Hooks 使用规范
+
+### 1. 状态管理
+- 使用 `useState` 管理本地状态
+- 使用 `useEffect` 处理副作用
+- 使用 `useCallback` 和 `useMemo` 优化性能
+
+```typescript
+// ✅ 正确
+function TemplatePreview({ plugin, formatIndex, templateData }: TemplatePreviewProps) {
+  const [templateError, setTemplateError] = React.useState<null | string>(null);
+  const [template, setTemplate] = React.useState<null | string>(null);
+  const [forceRef, setForceRef] = React.useState<number>(0);
+  
+  // 处理文件更新事件
+  React.useEffect(() => {
+    const fmt = plugin.settings.exportFormats[formatIndex];
+    const mainFile = fmt.templatePath
+      ? plugin.app.vault.getAbstractFileByPath(sanitizeObsidianPath(fmt.templatePath))
+      : null;
+    
+    const onUpdate = (file: TFile) => {
+      if (!file) return;
+      if (file === mainFile) {
+        setForceRef(Date.now());
+      }
+    };
+    
+    const onSettingsUpdate = () => {
+      setForceRef(Date.now());
+    };
+    
+    plugin.emitter.on('fileUpdated', onUpdate);
+    plugin.emitter.on('settingsUpdated', onSettingsUpdate);
+    
+    return () => {
+      plugin.emitter.off('fileUpdated', onUpdate);
+      plugin.emitter.off('settingsUpdated', onSettingsUpdate);
+    };
+  }, [formatIndex]);
+}
+```
+
+### 2. 自定义 Hooks
+- 提取可复用的逻辑到自定义 Hooks
+- 使用描述性的 Hook 名称
+- 提供适当的类型注解
+
+```typescript
+// ✅ 正确
+function useTemplatePreview(plugin: ZoteroConnector, formatIndex: number | null) {
+  const [template, setTemplate] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  
+  React.useEffect(() => {
+    if (formatIndex === null) return;
+    
+    // 模板预览逻辑
+  }, [formatIndex, plugin]);
+  
+  return { template, error };
+}
+```
+
+## 事件处理规范
+
+### 1. 事件处理器
+- 使用箭头函数定义事件处理器
+- 提供适当的类型注解
+- 处理事件对象
+
+```typescript
+// ✅ 正确
+const handleFormatChange = (value: string) => {
+  setSelectedFormat(value);
+  onFormatChange?.(value);
+};
+
+const handleTemplateChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+  setTemplate(event.target.value);
+  onTemplateChange?.(event.target.value);
+};
+```
+
+### 2. 表单处理
+- 使用受控组件管理表单状态
+- 提供适当的验证
+- 处理表单提交
+
+```typescript
+// ✅ 正确
+function ExportFormatSettings({ plugin, formatIndex }: ExportFormatSettingsProps) {
+  const [name, setName] = React.useState('');
+  const [outputPath, setOutputPath] = React.useState('');
+  
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    
+    if (!name.trim()) {
+      new Notice('Format name is required');
+      return;
+    }
+    
+    // 保存设置
+    saveFormat();
+  };
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Format name"
+      />
+      <button type="submit">Save</button>
+    </form>
+  );
+}
+```
+
+## 样式和主题
+
+### 1. CSS 类名
+- 使用 BEM 命名约定
+- 避免内联样式
+- 使用 CSS 模块或类名工具
+
+```typescript
+// ✅ 正确
+return (
+  <div className="zotero-connector">
+    <div className="zotero-connector__header">
+      <h2 className="zotero-connector__title">Zotero Integration</h2>
+    </div>
+    <div className="zotero-connector__content">
+      <div className="zotero-connector__settings">
+        {/* 设置内容 */}
+      </div>
+    </div>
+  </div>
+);
+```
+
+### 2. 主题适配
+- 支持 Obsidian 的明暗主题
+- 使用 CSS 变量定义颜色
+- 提供主题切换支持
+
+```typescript
+// ✅ 正确
+const tomorrowLight = {
+  scheme: 'Tomorrow',
+  base00: '#ffffff',
+  base01: '#e0e0e0',
+  // ... 其他颜色
+};
+
+const tomorrowDark = {
+  scheme: 'Tomorrow Night',
+  base00: '#1d1f21',
+  base01: '#282a2e',
+  // ... 其他颜色
+};
+
+function JSONTreeView({ data }: { data: any }) {
+  const theme = document.body.classList.contains('theme-dark') 
+    ? tomorrowDark 
+    : tomorrowLight;
+  
+  return (
+    <JSONTree
+      data={data}
+      theme={theme}
+      invertTheme={false}
+    />
+  );
+}
+```
+
+## 组件通信
+
+### 1. Props 传递
+- 使用 TypeScript 接口定义 Props
+- 提供默认值
+- 使用可选属性
+
+```typescript
+// ✅ 正确
+interface SettingItemProps {
+  name: string;
+  description?: string;
+  children: React.ReactNode;
+  className?: string;
+}
+
+function SettingItem({ 
+  name, 
+  description, 
+  children, 
+  className = '' 
+}: SettingItemProps) {
+  return (
+    <div className={`setting-item ${className}`}>
+      <div className="setting-item-info">
+        <div className="setting-item-name">{name}</div>
+        {description && (
+          <div className="setting-item-description">{description}</div>
+        )}
+      </div>
+      <div className="setting-item-control">
+        {children}
+      </div>
+    </div>
+  );
+}
+```
+
+### 2. 事件回调
+- 使用函数类型定义回调
+- 提供适当的参数类型
+- 处理可选回调
+
+```typescript
+// ✅ 正确
+interface CiteFormatSettingsProps {
+  plugin: ZoteroConnector;
+  formatIndex: number;
+  onFormatChange?: (format: CitationFormat) => void;
+  onFormatDelete?: (index: number) => void;
+}
+
+function CiteFormatSettings({
+  plugin,
+  formatIndex,
+  onFormatChange,
+  onFormatDelete
+}: CiteFormatSettingsProps) {
+  const handleFormatChange = (format: CitationFormat) => {
+    onFormatChange?.(format);
+  };
+  
+  const handleDelete = () => {
+    onFormatDelete?.(formatIndex);
+  };
+  
+  return (
+    <div>
+      {/* 设置界面 */}
+    </div>
+  );
+}
+```
+
+## 性能优化
+
+### 1. 组件优化
+- 使用 `React.memo` 包装纯组件
+- 使用 `useCallback` 优化回调函数
+- 使用 `useMemo` 优化计算值
+
+```typescript
+// ✅ 正确
+const TemplatePreview = React.memo(function TemplatePreview({
+  plugin,
+  formatIndex,
+  templateData,
+}: TemplatePreviewProps) {
+  const memoizedTemplate = React.useMemo(() => {
+    // 复杂的模板计算
+    return computeTemplate(templateData);
+  }, [templateData]);
+  
+  const handleTemplateUpdate = React.useCallback(() => {
+    setForceRef(Date.now());
+  }, []);
+  
+  return (
+    <div>
+      {/* 组件内容 */}
+    </div>
+  );
+});
+```
+
+### 2. 列表渲染
+- 使用 `key` 属性优化列表渲染
+- 使用虚拟滚动处理大量数据
+- 避免在渲染中创建对象
+
+```typescript
+// ✅ 正确
+function FormatList({ formats, onFormatSelect }: FormatListProps) {
+  return (
+    <div className="format-list">
+      {formats.map((format, index) => (
+        <FormatItem
+          key={`${format.name}-${index}`}
+          format={format}
+          index={index}
+          onSelect={onFormatSelect}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+## 错误边界
+
+### 1. 错误处理
+- 使用错误边界捕获组件错误
+- 提供用户友好的错误信息
+- 记录错误日志
+
+```typescript
+// ✅ 正确
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Component error:', error, errorInfo);
+  }
+  
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="error-boundary">
+          <h3>Something went wrong</h3>
+          <p>Please try refreshing the page</p>
+        </div>
+      );
+    }
+    
+    return this.props.children;
+  }
+}
+```
+
+### 2. 加载状态
+- 提供加载指示器
+- 处理异步操作状态
+- 避免阻塞用户界面
+
+```typescript
+// ✅ 正确
+function LoadingSpinner({ message = 'Loading...' }: { message?: string }) {
+  return (
+    <div className="loading-spinner">
+      <div className="spinner"></div>
+      <p>{message}</p>
+    </div>
+  );
+}
+
+function DataView({ data, isLoading, error }: DataViewProps) {
+  if (isLoading) {
+    return <LoadingSpinner message="Loading data..." />;
+  }
+  
+  if (error) {
+    return (
+      <div className="error-message">
+        <p>Error: {error.message}</p>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="data-view">
+      {/* 数据显示 */}
+    </div>
+  );
+}
+```
+
+## 可访问性
+
+### 1. ARIA 属性
+- 使用适当的 ARIA 属性
+- 提供键盘导航支持
+- 确保屏幕阅读器兼容性
+
+```typescript
+// ✅ 正确
+function Dropdown({ options, value, onChange }: DropdownProps) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      aria-label="Select option"
+    >
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+```
+
+### 2. 焦点管理
+- 管理组件焦点
+- 提供键盘快捷键
+- 处理焦点陷阱
+
+```typescript
+// ✅ 正确
+function Modal({ isOpen, onClose, children }: ModalProps) {
+  const modalRef = React.useRef<HTMLDivElement>(null);
+  
+  React.useEffect(() => {
+    if (isOpen && modalRef.current) {
+      modalRef.current.focus();
+    }
+  }, [isOpen]);
+  
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      onClose();
+    }
+  };
+  
+  if (!isOpen) return null;
+  
+  return (
+    <div
+      ref={modalRef}
+      className="modal"
+      tabIndex={-1}
+      onKeyDown={handleKeyDown}
+      role="dialog"
+      aria-modal="true"
+    >
+      {children}
+    </div>
+  );
+}
+```
+description:
+globs:
+alwaysApply: false
+---
