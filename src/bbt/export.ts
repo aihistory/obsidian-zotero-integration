@@ -137,7 +137,7 @@ function convertNativeAnnotation(
 
   if (annotation.annotationPosition) {
     if (annotation.annotationPosition.pageIndex) {
-      annot.page = annotation.annotationPosition.pageIndex + 1
+      annot.page = annotation.annotationPosition.pageIndex + 1;
     }
 
     if (annotation.annotationPosition.rects) {
@@ -339,6 +339,11 @@ async function processItem(
       database,
       cslStyle
     );
+  }
+
+  // 保留封面图片路径，确保在模板渲染时可用
+  if (item.coverImagePath) {
+    console.log('📖 保留封面图片路径:', item.coverImagePath);
   }
 }
 
@@ -579,9 +584,7 @@ async function getTemplateData(
   item: any,
   lastImportDate: moment.Moment
 ) {
-  const firstAnnots = item.attachments.find(
-    (a: any) => a.annotations?.length
-  );
+  const firstAnnots = item.attachments.find((a: any) => a.annotations?.length);
 
   item.annotations = firstAnnots?.annotations ?? [];
   item.lastImportDate = lastImportDate;
@@ -593,7 +596,8 @@ async function getTemplateData(
 
 export async function exportToMarkdown(
   params: ExportToMarkdownParams,
-  explicitCiteKeys?: CiteKey[]
+  explicitCiteKeys?: CiteKey[],
+  preprocessedItemData?: any[]
 ): Promise<string[]> {
   const importDate = moment();
   const { database, exportFormat, settings } = params;
@@ -607,10 +611,17 @@ export async function exportToMarkdown(
 
   const libraryID = citeKeys[0].library;
   let itemData: any;
-  try {
-    itemData = await getItemJSONFromCiteKeys(citeKeys, database, libraryID);
-  } catch (e) {
-    return [];
+  
+  // 如果提供了预处理的 itemData，直接使用；否则重新获取
+  if (preprocessedItemData) {
+    itemData = preprocessedItemData;
+    console.log('📖 使用预处理的 itemData，包含封面图片路径');
+  } else {
+    try {
+      itemData = await getItemJSONFromCiteKeys(citeKeys, database, libraryID);
+    } catch (e) {
+      return [];
+    }
   }
 
   // Variable to store the paths of the markdown files that will be created on import.

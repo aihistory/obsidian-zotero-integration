@@ -115,7 +115,8 @@ export async function applyBasicTemplates(
   const attachmentZoteroLink = (
     await renderTemplate(sourceFile, attachmentZoteroLinkTemplate, itemData)
   ).trim();
-  if (attachmentZoteroLink) itemData.firstAttachmentZoteroLink = attachmentZoteroLink;
+  if (attachmentZoteroLink)
+    itemData.firstAttachmentZoteroLink = attachmentZoteroLink;
 
   if (itemData.notes?.length) {
     const notes = itemData.notes
@@ -151,6 +152,47 @@ export async function applyBasicTemplates(
         lastExportDate: moment(0),
       })
     ).trim();
+  }
+
+  // 处理封面图片相关的模板变量
+  if (itemData.coverImagePath) {
+    // 添加封面图片路径作为模板变量
+    itemData.coverImage = itemData.coverImagePath;
+    
+    // 根据路径类型添加不同的变量
+    if (itemData.coverImagePath.startsWith('http')) {
+      // 图床地址
+      itemData.coverImageUrl = itemData.coverImagePath;
+      itemData.coverImageType = 'remote';
+      
+      // 生成标准的 Markdown 图片链接
+      const title = itemData.title || '封面图片';
+      itemData.coverImageMarkdown = `![${title}](${itemData.coverImagePath})`;
+    } else {
+      // 本地文件路径
+      itemData.coverImageLocal = itemData.coverImagePath;
+      itemData.coverImageType = 'local';
+      
+      // 生成 Obsidian 内部链接格式
+      const fileName = itemData.coverImagePath.split('/').pop();
+      if (fileName) {
+        itemData.coverImageLink = `![[${fileName}]]`;
+      }
+      
+      // 生成标准的 Markdown 图片链接（使用 file:// 协议）
+      const title = itemData.title || '封面图片';
+      const filePath = itemData.coverImagePath.replace(/ /g, '%20');
+      itemData.coverImageMarkdown = `![${title}](file://${filePath})`;
+    }
+    
+    console.log('✅ 封面图片模板变量已设置:', {
+      coverImage: itemData.coverImage,
+      coverImageUrl: itemData.coverImageUrl,
+      coverImageLocal: itemData.coverImageLocal,
+      coverImageType: itemData.coverImageType,
+      coverImageLink: itemData.coverImageLink,
+      coverImageMarkdown: itemData.coverImageMarkdown
+    });
   }
 
   return itemData;

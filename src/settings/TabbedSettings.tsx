@@ -16,7 +16,7 @@ import { ExportFormatSettings } from './ExportFormatSettings';
 import { Icon } from './Icon';
 import { SettingItem } from './SettingItem';
 
-interface SettingsComponentProps {
+interface TabbedSettingsComponentProps {
   settings: ZoteroConnectorSettings;
   addCiteFormat: (format: CitationFormat) => CitationFormat[];
   updateCiteFormat: (index: number, format: CitationFormat) => CitationFormat[];
@@ -27,7 +27,9 @@ interface SettingsComponentProps {
   updateSetting: (key: keyof ZoteroConnectorSettings, value: any) => void;
 }
 
-function SettingsComponent({
+type TabType = 'general' | 'citation' | 'import' | 'import-image' | 'cover' | 'ocr';
+
+function TabbedSettingsComponent({
   settings,
   addCiteFormat,
   updateCiteFormat,
@@ -36,21 +38,25 @@ function SettingsComponent({
   updateExportFormat,
   removeExportFormat,
   updateSetting,
-}: SettingsComponentProps) {
+}: TabbedSettingsComponentProps) {
+  const [activeTab, setActiveTab] = React.useState<TabType>('general');
   const [citeFormatState, setCiteFormatState] = React.useState(
     settings.citeFormats
   );
   const [exportFormatState, setExportFormatState] = React.useState(
     settings.exportFormats
   );
-
   const [openNoteAfterImportState, setOpenNoteAfterImport] = React.useState(
     !!settings.openNoteAfterImport
   );
-
   const [ocrState, setOCRState] = React.useState(settings.pdfExportImageOCR);
-
   const [concat, setConcat] = React.useState(!!settings.shouldConcat);
+  const [useCustomPort, setUseCustomPort] = React.useState(
+    settings.database === 'Custom'
+  );
+
+  const tessPathRef = React.useRef<HTMLInputElement>(null);
+  const tessDataPathRef = React.useRef<HTMLInputElement>(null);
 
   const updateCite = React.useCallback(
     debounce(
@@ -99,7 +105,7 @@ function SettingsComponent({
         imageBaseNameTemplate: 'image',
       })
     );
-  }, [addExportFormat, citeFormatState]);
+  }, [addExportFormat, exportFormatState]);
 
   const removeExport = React.useCallback(
     (index: number) => {
@@ -108,16 +114,17 @@ function SettingsComponent({
     [removeExportFormat]
   );
 
-  const tessPathRef = React.useRef<HTMLInputElement>(null);
-  const tessDataPathRef = React.useRef<HTMLInputElement>(null);
+  const tabs: { id: TabType; label: string; icon: string }[] = [
+    { id: 'general', label: 'General', icon: 'settings' },
+    { id: 'citation', label: 'Citation Formats', icon: 'quote' },
+    { id: 'import', label: 'Import Formats', icon: 'download' },
+    { id: 'import-image', label: 'Import Image', icon: 'image' },
+    { id: 'cover', label: 'Cover', icon: 'book-open' },
+    { id: 'ocr', label: 'OCR', icon: 'text-select' },
+  ];
 
-  const [useCustomPort, setUseCustomPort] = React.useState(
-    settings.database === 'Custom'
-  );
-
-  return (
+  const renderGeneralTab = () => (
     <div>
-      <SettingItem name="General Settings" isHeading />
       <AssetDownloader settings={settings} updateSetting={updateSetting} />
       <SettingItem
         name="Database"
@@ -223,7 +230,11 @@ function SettingsComponent({
           className={`checkbox-container${concat ? ' is-enabled' : ''}`}
         />
       </SettingItem>
-      <SettingItem name="Citation Formats" isHeading />
+    </div>
+  );
+
+  const renderCitationTab = () => (
+    <div>
       <SettingItem>
         <button onClick={addCite} className="mod-cta">
           Add Citation Format
@@ -240,8 +251,11 @@ function SettingsComponent({
           />
         );
       })}
+    </div>
+  );
 
-      <SettingItem name="Import Formats" isHeading />
+  const renderImportTab = () => (
+    <div>
       <SettingItem>
         <button onClick={addExport} className="mod-cta">
           Add Import Format
@@ -258,12 +272,11 @@ function SettingsComponent({
           />
         );
       })}
+    </div>
+  );
 
-      <SettingItem
-        name="Import Image Settings"
-        description="Rectangle annotations will be extracted from PDFs as images."
-        isHeading
-      />
+  const renderImportImageTab = () => (
+    <div>
       <SettingItem name="Image Format">
         <select
           className="dropdown"
@@ -306,6 +319,17 @@ function SettingsComponent({
           defaultValue={settings.pdfExportImageDPI.toString()}
         />
       </SettingItem>
+    </div>
+  );
+
+  const renderCoverTab = () => (
+    <div>
+      <CoverImageSettings settings={settings} updateSetting={updateSetting} />
+    </div>
+  );
+
+  const renderOcrTab = () => (
+    <div>
       <SettingItem
         name="Image OCR"
         description={
@@ -345,9 +369,6 @@ function SettingsComponent({
           className={`checkbox-container${ocrState ? ' is-enabled' : ''}`}
         />
       </SettingItem>
-
-      {/* 封面图片设置 */}
-      <CoverImageSettings settings={settings} updateSetting={updateSetting} />
       <SettingItem
         name="Tesseract path"
         description={
@@ -465,9 +486,48 @@ function SettingsComponent({
       </SettingItem>
     </div>
   );
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'general':
+        return renderGeneralTab();
+      case 'citation':
+        return renderCitationTab();
+      case 'import':
+        return renderImportTab();
+      case 'import-image':
+        return renderImportImageTab();
+      case 'cover':
+        return renderCoverTab();
+      case 'ocr':
+        return renderOcrTab();
+      default:
+        return renderGeneralTab();
+    }
+  };
+
+  return (
+    <div className="zt-tabbed-settings">
+      <div className="zt-tabs">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            className={`zt-tab ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            <Icon name={tab.icon} />
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </div>
+      <div className="zt-tab-content">
+        {renderTabContent()}
+      </div>
+    </div>
+  );
 }
 
-export class ZoteroConnectorSettingsTab extends PluginSettingTab {
+export class ZoteroConnectorTabbedSettingsTab extends PluginSettingTab {
   plugin: ZoteroConnector;
   dbTimer: number;
 
@@ -478,7 +538,7 @@ export class ZoteroConnectorSettingsTab extends PluginSettingTab {
 
   display() {
     ReactDOM.render(
-      <SettingsComponent
+      <TabbedSettingsComponent
         settings={this.plugin.settings}
         addCiteFormat={this.addCiteFormat}
         updateCiteFormat={this.updateCiteFormat}

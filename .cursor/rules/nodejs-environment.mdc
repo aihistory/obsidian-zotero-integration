@@ -1,0 +1,256 @@
+# Node.js 环境配置规则
+
+## 项目环境信息
+
+### 系统环境
+- **操作系统**: Linux 6.14.0-27-generic
+- **Shell**: /bin/bash
+- **工作目录**: /home/aihistorian/workspace/obsidian-zotero-integration
+
+### Node.js 版本管理
+- **版本管理器**: nvm (Node Version Manager)
+- **nvm 版本**: 0.39.0
+- **安装路径**: /home/aihistorian/.nvm
+
+### Node.js 版本配置
+- **当前使用版本**: v20.19.4
+- **npm 版本**: 10.8.2
+- **默认版本**: v18.20.8
+- **可用版本**:
+  - v18.20.8 (当前系统版本)
+  - v20.19.1
+  - v20.19.4 (推荐使用)
+  - system
+
+## 环境设置命令
+
+### 加载 nvm 环境
+```bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+```
+
+### 切换 Node.js 版本
+```bash
+# 使用 Node.js 20
+nvm use 20
+# 或指定具体版本
+nvm use v20.19.4
+```
+
+### 验证环境
+```bash
+node --version
+npm --version
+nvm --version
+```
+
+## 项目构建配置
+
+### 依赖管理
+- **包管理器**: npm (推荐) / yarn
+- **Node.js 要求**: >= 20.0.0 (某些依赖需要)
+- **安装命令**: `npm install --ignore-engines`
+
+### 构建脚本
+```bash
+# 安装依赖
+npm install
+
+# 类型检查
+npm run check-types
+
+# 代码格式化
+npm run prettier
+
+# 生产构建
+npm run build
+
+# 开发模式
+npm run dev
+```
+
+### 构建输出
+- **主文件**: main.js (约 988KB)
+- **样式文件**: styles.css
+- **清单文件**: manifest.json
+
+## 开发工具配置
+
+### TypeScript 配置
+- **TypeScript 版本**: 5.1.6
+- **配置文件**: tsconfig.json
+- **类型检查**: `tsc --noemit`
+
+### ESLint 配置
+- **ESLint 版本**: 8.44.0
+- **配置文件**: .eslintrc.js
+- **代码检查**: `npm run lint`
+- **自动修复**: `npm run lint:fix`
+
+### Prettier 配置
+- **Prettier 版本**: 2.8.8
+- **配置文件**: prettier.config.cjs
+- **格式化**: `npm run prettier`
+
+## 项目特定配置
+
+### Obsidian 插件开发
+- **Obsidian API 版本**: 1.2.8
+- **构建工具**: esbuild 0.18.11
+- **外部依赖**: obsidian, electron, codemirror 等
+
+### 封面图片功能
+- **新增功能**: 从 obsidian-douban 导入的封面处理
+- **依赖要求**: Node.js >= 20.0.0
+- **图床支持**: PicGo
+- **图片格式**: JPG, PNG, GIF, BMP, WebP
+
+## 常见问题解决
+
+### 版本兼容性问题
+```bash
+# 如果遇到 Node.js 版本不兼容
+npm install --ignore-engines
+# 或切换到 Node.js 20
+nvm use 20
+```
+
+### 网络连接问题
+```bash
+# 如果 yarn 安装失败，使用 npm
+npm install
+# 或配置镜像源
+npm config set registry https://registry.npmmirror.com
+```
+
+### 权限问题
+```bash
+# 确保有写入权限
+chmod -R 755 .
+# 或使用 sudo (不推荐)
+sudo npm install
+```
+
+## 开发工作流
+
+### 1. 环境准备
+```bash
+# 加载 nvm
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+# 切换到 Node.js 20
+nvm use v20.19.4
+
+# 验证环境
+node --version  # 应该显示 v20.19.4
+```
+
+### 2. 依赖安装
+```bash
+# 安装项目依赖
+npm install
+```
+
+### 3. 开发流程
+```bash
+# 类型检查
+npm run check-types
+
+# 代码格式化
+npm run prettier
+
+# 构建项目
+npm run build
+```
+
+### 4. 测试验证
+```bash
+# 检查生成的文件
+ls -la main.js
+du -h main.js
+```
+
+## 环境变量设置
+
+### 推荐的环境变量
+```bash
+# 在 ~/.bashrc 中添加
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
+# 设置默认 Node.js 版本
+nvm alias default v20.19.4
+```
+
+### 项目特定环境变量
+```bash
+# 如果需要设置项目特定的环境变量
+export OBSIDIAN_PLUGIN_DEV=true
+export NODE_ENV=development
+```
+
+## 性能优化建议
+
+### 构建优化
+- 使用生产模式构建: `npm run build`
+- 启用代码压缩和优化
+- 使用 Tree Shaking 减少包大小
+
+### 开发优化
+- 使用开发模式: `npm run dev`
+- 启用热重载
+- 使用源码映射进行调试
+
+## 安全注意事项
+
+### 依赖安全
+- 定期运行 `npm audit` 检查安全漏洞
+- 及时更新依赖版本
+- 使用 `npm audit fix` 修复可修复的漏洞
+
+### 代码安全
+- 避免在代码中硬编码敏感信息
+- 使用环境变量管理配置
+- 定期备份重要代码
+
+## 故障排除
+
+### 常见错误及解决方案
+
+1. **Node.js 版本不兼容**
+   ```bash
+   nvm use v20.19.4
+   npm install --ignore-engines
+   ```
+
+2. **依赖安装失败**
+   ```bash
+   rm -rf node_modules package-lock.json
+   npm install
+   ```
+
+3. **TypeScript 编译错误**
+   ```bash
+   npm run check-types
+   # 根据错误信息修复类型问题
+   ```
+
+4. **构建失败**
+   ```bash
+   npm run build
+   # 检查 esbuild 配置和依赖
+   ```
+
+## 更新记录
+
+- **2024-08-17**: 初始配置，设置 Node.js v20.19.4
+- **2024-08-17**: 成功编译 obsidian-zotero-integration 项目
+- **2024-08-17**: 集成封面图片功能，修复 TypeScript 错误
+description:
+globs:
+alwaysApply: false
+---

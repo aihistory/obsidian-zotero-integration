@@ -1,5 +1,34 @@
 # TypeScript 开发规范
 
+> **注意**: 本项目使用 Node.js v20.19.4 和 nvm 进行版本管理。详细的环境配置请参考 `.cursor/rules/nodejs-environment.mdc`。
+
+## 环境要求
+
+- **Node.js**: >= 20.0.0 (推荐 v20.19.4)
+- **TypeScript**: 5.1.6
+- **包管理器**: npm (推荐) / yarn
+- **构建工具**: esbuild 0.18.11
+
+## 快速开始
+
+```bash
+# 1. 加载 nvm 环境
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+# 2. 切换到 Node.js 20
+nvm use v20.19.4
+
+# 3. 安装依赖
+npm install
+
+# 4. 类型检查
+npm run check-types
+
+# 5. 构建项目
+npm run build
+```
+
 ## 类型定义规范
 
 ### 1. 接口定义

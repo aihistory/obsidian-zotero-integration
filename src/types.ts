@@ -91,6 +91,24 @@ export interface ZoteroConnectorSettings {
   settingsVersion?: number;
   shouldConcat?: boolean;
   whichNotesToOpenAfterImport: NotesToOpenAfterImport;
+
+  // 封面相关设置
+  cacheImage?: boolean;
+  cacheHighQuantityImage?: boolean;
+  attachmentPath?: string;
+  pictureBedFlag?: boolean;
+  pictureBedType?: string;
+  pictureBedSetting?: PictureBedSetting;
+}
+
+// 图床设置接口
+export interface PictureBedSetting {
+  url: string;
+}
+
+// 图床类型枚举
+export enum PictureBedType {
+  PicGo = 'PicGo',
 }
 
 export interface CiteKeyExport {
